@@ -1,10 +1,11 @@
 package com.example.demo.repository;
 
 import com.example.demo.newmodel.Product;
+import lombok.val;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static io.vavr.API.List;
+import static io.vavr.API.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class ProductRepositoryTest {
@@ -19,25 +20,20 @@ public class ProductRepositoryTest {
   @Test
   void should_insert_then_return_product() {
     // GIVEN
-    Product product =
-        Product
-            .builder()
-            .id(12345L)
-            .colorIds(List(123, 456))
-            .build();
+    val product = Product.builder()
+        .id(12345L)
+        .colorIds(Set(123, 456))
+        .build();
 
     // WHEN
-    Product result = productRepository.save(product);
+    val result = productRepository.save(product);
 
     //THEN
-    assertThat(result)
-        .isEqualTo(
-            Product
-                .builder()
-                .id(12345L)
-                .colorIds(List(123, 456))
-                .build()
-        );
+    assertThat(result).isEqualTo(
+        Product.builder()
+            .id(12345L)
+            .colorIds(Set(123, 456))
+            .build());
   }
 
 }

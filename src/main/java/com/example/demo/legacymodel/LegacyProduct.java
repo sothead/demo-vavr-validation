@@ -1,13 +1,14 @@
 package com.example.demo.legacymodel;
 
-import io.vavr.collection.List;
 import lombok.Builder;
 import lombok.Value;
+
+import java.util.Set;
 
 @Builder
 @Value
 public class LegacyProduct {
 
   String productId;
-  List<Integer> colorList;
+  Set<Integer> colorList;
 }

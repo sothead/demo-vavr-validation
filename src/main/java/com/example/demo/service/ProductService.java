@@ -4,61 +4,53 @@ import com.example.demo.error.ProductError;
 import com.example.demo.legacymodel.LegacyProduct;
 import com.example.demo.newmodel.Product;
 import com.example.demo.repository.ProductRepository;
-import io.vavr.collection.List;
+import io.vavr.collection.HashSet;
+import io.vavr.collection.Set;
 import io.vavr.control.Validation;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static io.vavr.API.Option;
 import static io.vavr.API.Try;
 
+@RequiredArgsConstructor
 public class ProductService {
 
-  private static final Logger log = LoggerFactory.getLogger(ProductService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProductService.class);
 
-  private ProductRepository productRepository;
-
-  public ProductService(ProductRepository productRepository) {
-    this.productRepository = productRepository;
-  }
+  private final ProductRepository productRepository;
 
   public Product saveProduct(final LegacyProduct legacyProduct) {
-    return Validation
-        .combine(
-            validateProdutId(legacyProduct.getProductId()),
-            validateColors(legacyProduct)
-        )
+    final var map = Validation.combine(
+            validateProductId(legacyProduct.getProductId()),
+            validateColors(legacyProduct.getColorList()))
         .ap(ProductService::toProduct)
-        .map(productRepository::save)
-        .mapError(productErrors -> {
-          productErrors.map(ProductError::getMessage)
-              .forEach(log::error);
-          return productErrors;
-        })
+        .map(productRepository::save);
+    return map
+        .peekError(productErrors ->
+            productErrors.map(ProductError::getMessage)
+                .forEach(LOGGER::error))
         .getOrNull();
   }
 
-  private Validation<ProductError, List<Integer>> validateColors(LegacyProduct legacyProduct) {
-    return Option(legacyProduct.getColorList())
-        .toValidation(() -> ProductError.builder().message("Color list is null").build());
+  private static Validation<ProductError, Set<Integer>> validateColors(final java.util.Set<Integer> colors) {
+    return Option(colors).toValidation(() -> ProductError.of("Color list is null"))
+        .map(HashSet::ofAll);
   }
 
-  private Validation<ProductError, Long> validateProdutId(String productId) {
-    return Option(productId)
-        .toValidation(() -> ProductError.builder().message("Product ID is null").build())
-        .flatMap(
-            notEmptyId -> Try(() -> Long.valueOf(notEmptyId))
-                .toValidation(() -> ProductError.builder().message("Product ID [{" + notEmptyId + "}] is not a number").build())
-        );
+  private static Validation<ProductError, Long> validateProductId(final String productId) {
+    return Option(productId).toValidation(() -> ProductError.of("Product ID is null"))
+        .flatMap(notEmptyId ->
+            Try(() -> Long.valueOf(notEmptyId))
+                .toValidation(() -> ProductError.of("Product ID [" + notEmptyId + "] is not a number")));
   }
 
-  private static Product toProduct(final Long productId, final List<Integer> colors) {
-    return
-        Product
-            .builder()
-            .id(productId)
-            .colorIds(colors)
-            .build();
+  private static Product toProduct(final Long productId, final Set<Integer> colors) {
+    return Product.builder()
+        .id(productId)
+        .colorIds(colors)
+        .build();
   }
 
   // legacy
@@ -68,31 +60,28 @@ public class ProductService {
       try {
         Long.valueOf(productId);
       } catch (NumberFormatException e) {
-        log.error("Product ID [{}] is not a number", productId);
+        LOGGER.error("Product ID [{}] is not a number", productId);
         return null;
       }
     } else {
-      log.error("Product ID is null");
+      LOGGER.error("Product ID is null");
       return null;
     }
 
-    List<Integer> colorList = legacyProduct.getColorList();
+    java.util.Set<Integer> colorList = legacyProduct.getColorList();
     if (colorList == null) {
-      log.error("Color list is null");
+      LOGGER.error("Color list is null");
       return null;
     }
 
-    final Product product = toProduct(legacyProduct);
+    Product product = toProduct(legacyProduct);
     return productRepository.save(product);
   }
 
   private static Product toProduct(final LegacyProduct legacyProduct) {
-    return
-        Product
-            .builder()
-            .id(Long.valueOf(legacyProduct.getProductId()))
-            .colorIds(legacyProduct.getColorList())
-            .build();
+    return Product.builder()
+        .id(Long.valueOf(legacyProduct.getProductId()))
+        .colorIds(HashSet.ofAll(legacyProduct.getColorList()))
+        .build();
   }
-
 }
